@@ -83,6 +83,7 @@ export default function App() {
   const readyRef = useRef(false);
   const playerHostRef = useRef(null);
   const syncTimerRef = useRef(null);
+  const fadeTimerRef = useRef(null);
   const trackCardTimerRef = useRef(null);
   const lastTrackCardIdRef = useRef("");
   const volumeRef = useRef(volume);
@@ -132,6 +133,16 @@ export default function App() {
     ambience.tremor.stop();
     ambience.context.close();
     ambienceRef.current = null;
+  }, []);
+
+  const applyTrackFade = useCallback(() => {
+    const player = playerRef.current;
+    if (!player || !readyRef.current) return;
+    const elapsed = Number(player.getCurrentTime?.() || 0);
+    const total = Number(player.getDuration?.() || 0);
+    let fade = Math.min(1, elapsed / 10);
+    if (total > 20) fade = Math.min(fade, Math.max(0, (total - elapsed) / 10));
+    player.setVolume?.(Math.round(volumeRef.current * Math.max(0, fade)));
   }, []);
 
   const syncTrack = useCallback((showTitleCard = false) => {
@@ -282,6 +293,7 @@ export default function App() {
               syncTrack();
             }, 800);
             syncTimerRef.current = window.setInterval(syncTrack, 2000);
+            fadeTimerRef.current = window.setInterval(applyTrackFade, 250);
           },
           onStateChange: (event) => {
             const state = window.YT.PlayerState;
@@ -296,7 +308,7 @@ export default function App() {
               errorCountRef.current = 0;
               startAmbience();
               event.target.unMute();
-              event.target.setVolume(volumeRef.current);
+              applyTrackFade();
               syncTrack(true);
             } else if (event.data === state.PAUSED) {
               isPlayingRef.current = false;
@@ -358,6 +370,7 @@ export default function App() {
       cancelled = true;
       readyRef.current = false;
       if (syncTimerRef.current) window.clearInterval(syncTimerRef.current);
+      if (fadeTimerRef.current) window.clearInterval(fadeTimerRef.current);
       if (trackCardTimerRef.current)
         window.clearTimeout(trackCardTimerRef.current);
       try {
@@ -369,7 +382,7 @@ export default function App() {
       stopAmbience();
       playerHost?.replaceChildren();
     };
-  }, [loadRandomStationPlaylist, startAmbience, stopAmbience, syncTrack]);
+  }, [applyTrackFade, loadRandomStationPlaylist, startAmbience, stopAmbience, syncTrack]);
 
   useEffect(() => {
     const clockTimer = window.setInterval(() => setWallClock(new Date()), 1000);
@@ -518,7 +531,7 @@ export default function App() {
       if (!stationPlaylistReadyRef.current) {
         loadRandomStationPlaylist(true);
         player.unMute();
-        player.setVolume(volumeRef.current);
+        applyTrackFade();
         return;
       }
       try {
@@ -539,7 +552,7 @@ export default function App() {
         player.playVideo();
       }
       player.unMute();
-      player.setVolume(volumeRef.current);
+      applyTrackFade();
       setIsPlaying(true);
       isPlayingRef.current = true;
       setTimeout(syncTrack, 600);
@@ -583,7 +596,7 @@ export default function App() {
     setVolume(value);
     localStorage.setItem("coach-volume", String(value));
     if (playerRef.current && readyRef.current) {
-      playerRef.current.setVolume(value);
+      applyTrackFade();
       if (value === 0) playerRef.current.mute();
       else playerRef.current.unMute();
     }
@@ -595,7 +608,7 @@ export default function App() {
     if (next) playerRef.current?.mute?.();
     else {
       playerRef.current?.unMute?.();
-      playerRef.current?.setVolume?.(volumeRef.current);
+      applyTrackFade();
     }
   };
 
