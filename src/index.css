@@ -3986,8 +3986,23 @@ footer {
   .station-switcher button,
   .station-switcher button small { font-size: 7.5px; }
   .listening-note { right: 70px; width: auto; max-width: 250px; }
-  .player-v3 { grid-template-columns: minmax(0, 1fr) 44px; gap: 7px; }
+  .player-v3 { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .player-v3 .player-volume { display: none; }
+  .player-v3 .player-buttons {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .player-v3 .player-buttons button:not(.main-play) {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 40px;
+  }
+  .player-v3 .player-buttons .main-play {
+    width: 44px;
+    height: 44px;
+  }
   .track-title-card { top: 43%; }
   .track-title-card strong { font-size: 22px; }
   .keyboard-hint { display: none; }

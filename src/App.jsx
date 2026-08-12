@@ -551,7 +551,8 @@ export default function App() {
 
   const handleNext = () => {
     if (!readyRef.current || !playerRef.current) return;
-    loadRandomStationPlaylist(true);
+    playbackAllowedRef.current = true;
+    playerRef.current.nextVideo();
     setIsPlaying(true);
     setTimeout(syncTrack, 600);
   };
