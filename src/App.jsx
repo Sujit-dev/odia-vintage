@@ -447,6 +447,15 @@ export default function App() {
       </header>
 
       <div className={`ride-motion ${rainEnabled ? 'rain-on' : ''}`} aria-hidden="true">
+        <video
+          className="windshield-video"
+          src="/assets/odia-night-road-loop.webm"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+        />
         <span className="windshield-motion">
           <i className="road-dash dash-left" />
           <i className="road-dash dash-right" />

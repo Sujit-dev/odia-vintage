@@ -2440,6 +2440,22 @@ footer {
   overflow: hidden;
   pointer-events: none;
 }
+.windshield-video {
+  position: absolute;
+  left: 16.5%;
+  top: 15.5%;
+  width: 69.5%;
+  height: 44%;
+  object-fit: cover;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: saturate(0.78) contrast(1.12) brightness(0.78);
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+  transition: opacity 1.2s ease;
+}
+.is-playing .windshield-video {
+  opacity: 0.72;
+}
 .windshield-motion {
   position: absolute;
   left: 18%;
@@ -2453,7 +2469,7 @@ footer {
   perspective: 420px;
 }
 .is-playing .windshield-motion {
-  opacity: 0.72;
+  opacity: 0.32;
 }
 .road-dash {
   position: absolute;
