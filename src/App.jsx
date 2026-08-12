@@ -664,7 +664,7 @@ export default function App() {
           : activeListeners === null
           ? "Connecting…"
           : <>
-              <span>{activeListeners} active {activeListeners === 1 ? "listener" : "listeners"}</span>
+              <span>{activeListeners} online</span>
               <b>Today’s peak {peakListenersToday ?? activeListeners}</b>
             </>}
       </div>
