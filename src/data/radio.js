@@ -31,7 +31,7 @@ export const STATIONS = [
       },
     ],
     whisper: "Songs from the fields of childhood",
-    moodOdia: "ପିଲାଦିନର ଖେଳ ସ୍ମୃତି",
+    moodOdia: "ପିଲାଦିନର ଅଭୁଲା ସ୍ମୃତି",
     mood: "Evenings we never wanted to end",
   },
   {
