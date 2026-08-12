@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HIGHWAY_ROUTES, STATIONS } from "./data/radio";
+import { BLOCKED_VIDEO_IDS, HIGHWAY_ROUTES, STATIONS } from "./data/radio";
 
 function readTrack(player) {
   try {
@@ -137,6 +137,11 @@ export default function App() {
   const syncTrack = useCallback((showTitleCard = false) => {
     if (!playerRef.current || !readyRef.current) return;
     const nextTrack = readTrack(playerRef.current);
+    if (nextTrack.id && BLOCKED_VIDEO_IDS.has(nextTrack.id)) {
+      setPlayerMessage("Skipping a blocked song…");
+      playerRef.current.nextVideo?.();
+      return;
+    }
     setTrack(nextTrack);
     if (nextTrack.id) setPlayerMessage("");
     if (

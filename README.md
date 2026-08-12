@@ -56,6 +56,8 @@ Station configuration lives in `src/data/radio.js`. Add another object to a stat
 
 Use only playlists appropriate for that station. In particular, Jagannath Bhajana should contain devotional songs only. The `seedVideoId` provides a reliable starting track while the playlist loads.
 
+To exclude a song from every station, add its YouTube video ID to `BLOCKED_VIDEO_IDS` in `src/data/radio.js`. Blocked songs are skipped automatically without being shown as the current track.
+
 ## Listener presence
 
 The production build includes a small `/api/presence` endpoint backed by Cloudflare D1. Active sessions send a heartbeat while the page remains visible or music is playing. Inactive sessions stop counting after roughly 70 seconds, and stale database rows are removed after one day. The interface also shows the highest concurrent listener count reached during the current day, resetting at midnight in the `Asia/Kolkata` timezone.

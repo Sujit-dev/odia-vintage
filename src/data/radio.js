@@ -6,6 +6,12 @@ export const RADIO = {
   playlistId: "PLAl6r73kHLXdNegg2CwaiXZrdULuXbQtd",
 };
 
+/** Videos excluded from every station, even when they appear in a playlist. */
+export const BLOCKED_VIDEO_IDS = new Set([
+  "aozVcw9ROH8",
+  "YJHlxINre3I",
+]);
+
 export const STATIONS = [
   {
     id: "vintage-odisha",
