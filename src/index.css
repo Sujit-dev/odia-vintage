@@ -2358,6 +2358,15 @@ footer {
   border-left: 1px solid rgba(255, 244, 228, 0.24);
   color: rgba(255, 244, 228, 0.52);
   font: inherit;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-5px);
+  transition: opacity 180ms ease, transform 180ms ease, visibility 180ms;
+}
+.active-presence:hover b {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
 }
 .active-presence.unavailable i {
   background: #cda96f;
