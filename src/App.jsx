@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { HIGHWAY_ROUTES, RADIO } from './data/radio';
+import { HIGHWAY_ROUTES, STATIONS } from './data/radio';
 
 function readTrack(player) {
   try {
@@ -7,16 +7,16 @@ function readTrack(player) {
     const index = player.getPlaylistIndex?.() ?? 0;
     return {
       id: data.video_id || '',
-      title: data.title || 'Tuning highway frequency…',
-      artist: data.author || 'YouTube Live Mix',
+      title: data.title || 'Preparing station…',
+      artist: data.author || '',
       route: HIGHWAY_ROUTES[Math.abs(index) % HIGHWAY_ROUTES.length],
       index: Math.max(0, index),
     };
   } catch {
     return {
       id: '',
-      title: 'Tuning highway frequency…',
-      artist: 'YouTube Live Mix',
+      title: 'Preparing station…',
+      artist: '',
       route: HIGHWAY_ROUTES[0],
       index: 0,
     };
@@ -29,25 +29,16 @@ function formatTime(seconds) {
   return `${mins}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 }
 
-function createRainSound(context) {
-  const length = context.sampleRate * 2;
-  const buffer = context.createBuffer(1, length, context.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
-  const source = context.createBufferSource();
-  const filter = context.createBiquadFilter();
-  const gain = context.createGain();
-  source.buffer = buffer;
-  source.loop = true;
-  filter.type = 'lowpass';
-  filter.frequency.value = 1250;
-  gain.gain.value = 0.018;
-  source.connect(filter).connect(gain).connect(context.destination);
-  source.start();
-  return source;
-}
-
 export default function App() {
+  const activeStation = STATIONS.find((station) => station.path === window.location.pathname.replace(/\/$/, '') || (station.path === '/' && window.location.pathname === '/')) || STATIONS[0];
+  const savedPlayback = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(`odia-vintage-playback-${activeStation.id}`) || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const savedPlaylist = activeStation.playlists.find((playlist) => playlist.id === savedPlayback?.playlistId) || activeStation.playlists[0];
   const [isPlaying, setIsPlaying] = useState(false);
   const [isApiReady, setIsApiReady] = useState(false);
   const [volume, setVolume] = useState(() => Number(localStorage.getItem('coach-volume')) || 80);
@@ -57,13 +48,16 @@ export default function App() {
   const [duration, setDuration] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [sleepMinutes, setSleepMinutes] = useState(0);
-  const [sleepRemaining, setSleepRemaining] = useState(0);
-  const [rainEnabled, setRainEnabled] = useState(() => localStorage.getItem('coach-rain') !== 'off');
+  const [wallClock, setWallClock] = useState(() => new Date());
+  const [isMuted, setIsMuted] = useState(false);
+  const [playerMessage, setPlayerMessage] = useState('Preparing station…');
+  const [activeListeners, setActiveListeners] = useState(null);
+  const [showTrackCard, setShowTrackCard] = useState(false);
+  const [showKeyboardHint, setShowKeyboardHint] = useState(() => localStorage.getItem('odia-vintage-key-help') !== 'seen');
   const [track, setTrack] = useState({
     id: '',
-    title: 'OSRTC Highway FM',
-    artist: 'Waiting for live mix…',
+    title: activeStation.label,
+    artist: 'Preparing station…',
     route: HIGHWAY_ROUTES[0],
     index: 0,
   });
@@ -72,14 +66,19 @@ export default function App() {
   const readyRef = useRef(false);
   const playerHostRef = useRef(null);
   const syncTimerRef = useRef(null);
+  const trackCardTimerRef = useRef(null);
+  const lastTrackCardIdRef = useRef('');
   const volumeRef = useRef(volume);
   const ambienceRef = useRef(null);
   const randomStartRef = useRef(0);
-  const rainEnabledRef = useRef(rainEnabled);
-  const blockedRef = useRef(new Set([
-    ...(RADIO.blockedVideoIds || []),
-    ...JSON.parse(localStorage.getItem('coach-blocked-songs') || '[]'),
-  ]));
+  const stationRef = useRef({ ...activeStation, playlistId: savedPlaylist.id, seedVideoId: savedPlaylist.seedVideoId });
+  const resumeRef = useRef({ index: Math.max(0, Number(savedPlayback?.index) || 0), time: Math.max(0, Number(savedPlayback?.time) || 0) });
+  const errorCountRef = useRef(0);
+  const stationGenerationRef = useRef(0);
+  const playbackAllowedRef = useRef(false);
+  const stationPlaylistReadyRef = useRef(false);
+  const isPlayingRef = useRef(false);
+  const togglePlayRef = useRef(null);
 
   const startAmbience = useCallback(() => {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -99,8 +98,7 @@ export default function App() {
     engine.connect(master).connect(context.destination);
     engine.start();
     tremor.start();
-    const rain = rainEnabledRef.current ? createRainSound(context) : null;
-    ambienceRef.current = { context, engine, tremor, rain };
+    ambienceRef.current = { context, engine, tremor };
   }, []);
 
   const stopAmbience = useCallback(() => {
@@ -108,22 +106,58 @@ export default function App() {
     if (!ambience) return;
     ambience.engine.stop();
     ambience.tremor.stop();
-    ambience.rain?.stop();
     ambience.context.close();
     ambienceRef.current = null;
   }, []);
 
-  const syncTrack = useCallback(() => {
+  const syncTrack = useCallback((showTitleCard = false) => {
     if (!playerRef.current || !readyRef.current) return;
     const nextTrack = readTrack(playerRef.current);
-    if (blockedRef.current.has(nextTrack.id)) {
-      playerRef.current.nextVideo?.();
-      return;
-    }
     setTrack(nextTrack);
+    if (nextTrack.id) setPlayerMessage('');
+    if (showTitleCard && nextTrack.id && nextTrack.id !== lastTrackCardIdRef.current) {
+      lastTrackCardIdRef.current = nextTrack.id;
+      setShowTrackCard(true);
+      window.clearTimeout(trackCardTimerRef.current);
+      trackCardTimerRef.current = window.setTimeout(() => setShowTrackCard(false), 3400);
+    }
     setCurrentTime(playerRef.current.getCurrentTime?.() || 0);
     setDuration(playerRef.current.getDuration?.() || 0);
+    if (nextTrack.id) {
+      localStorage.setItem(`odia-vintage-playback-${stationRef.current.id}`, JSON.stringify({
+        playlistId: stationRef.current.playlistId,
+        index: nextTrack.index,
+        time: Math.floor(playerRef.current.getCurrentTime?.() || 0),
+      }));
+    }
   }, []);
+
+  const loadRandomStationPlaylist = useCallback((playNow = true) => {
+    const player = playerRef.current;
+    const station = stationRef.current;
+    if (!player || !station?.playlists?.length) return;
+    const stationId = station.id;
+    const generation = stationGenerationRef.current;
+    const playlist = station.playlists[Math.floor(Math.random() * station.playlists.length)];
+    if (!station.playlists.some((item) => item.id === playlist.id)) return;
+    stationRef.current = { ...station, playlistId: playlist.id, seedVideoId: playlist.seedVideoId };
+    stationPlaylistReadyRef.current = true;
+    playbackAllowedRef.current = playNow;
+    try {
+      player[playNow ? 'loadPlaylist' : 'cuePlaylist']({ listType: 'playlist', list: playlist.id, index: 0 });
+      player.setShuffle?.(true);
+      window.setTimeout(() => {
+        if (stationGenerationRef.current !== generation || stationRef.current.id !== stationId || stationRef.current.playlistId !== playlist.id) return;
+        const songs = player.getPlaylist?.() || [];
+        if (songs.length > 1) player.playVideoAt?.(Math.floor(Math.random() * songs.length));
+        else if (playNow) player.playVideo?.();
+        syncTrack();
+      }, 700);
+    } catch {
+      if (playNow) player.loadVideoById?.(playlist.seedVideoId);
+      else player.cueVideoById?.(playlist.seedVideoId);
+    }
+  }, [syncTrack]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,10 +174,10 @@ export default function App() {
       playerRef.current = new window.YT.Player(mount, {
         width: '100%',
         height: '100%',
-        videoId: RADIO.seedVideoId,
+        videoId: stationRef.current.seedVideoId,
         playerVars: {
           listType: 'playlist',
-          list: RADIO.playlistId,
+          list: stationRef.current.playlistId,
           autoplay: 0,
           controls: 0,
           rel: 0,
@@ -156,29 +190,31 @@ export default function App() {
             if (cancelled) return;
             readyRef.current = true;
             setIsApiReady(true);
+            setPlayerMessage('Ready to play');
             event.target.unMute();
             event.target.setVolume(volumeRef.current);
             try {
               event.target.cuePlaylist({
                 listType: 'playlist',
-                list: RADIO.playlistId,
-                index: 0,
+                list: stationRef.current.playlistId,
+                index: resumeRef.current.index,
               });
             } catch {
-              event.target.cueVideoById(RADIO.seedVideoId);
+              event.target.cueVideoById(stationRef.current.seedVideoId);
             }
             window.setTimeout(() => {
               try {
                 const playlist = event.target.getPlaylist?.() || [];
                 if (playlist.length > 1) {
-                  randomStartRef.current = Math.floor(Math.random() * playlist.length);
+                  randomStartRef.current = Math.min(resumeRef.current.index, playlist.length - 1);
                   event.target.cuePlaylist({
                     listType: 'playlist',
-                    list: RADIO.playlistId,
+                    list: stationRef.current.playlistId,
                     index: randomStartRef.current,
                   });
                   event.target.setShuffle?.(true);
                 }
+                if (resumeRef.current.time > 0) event.target.seekTo?.(resumeRef.current.time, true);
               } catch {
                 /* keep the seeded track if shuffle is unavailable */
               }
@@ -189,25 +225,41 @@ export default function App() {
           onStateChange: (event) => {
             const state = window.YT.PlayerState;
             if (event.data === state.PLAYING) {
+              if (!playbackAllowedRef.current) {
+                event.target.pauseVideo?.();
+                return;
+              }
               setIsPlaying(true);
+              isPlayingRef.current = true;
+              setPlayerMessage('');
+              errorCountRef.current = 0;
               startAmbience();
               event.target.unMute();
               event.target.setVolume(volumeRef.current);
-              syncTrack();
+              syncTrack(true);
             } else if (event.data === state.PAUSED) {
+              isPlayingRef.current = false;
               setIsPlaying(false);
               stopAmbience();
             } else if (event.data === state.ENDED || event.data === state.CUED) {
-              if (event.data === state.ENDED) stopAmbience();
+              if (event.data === state.ENDED) {
+                stopAmbience();
+                loadRandomStationPlaylist(true);
+              }
               syncTrack();
             }
           },
           onError: (event) => {
             const code = event?.data;
             if (code === 101 || code === 150 || code === 100 || code === 2) {
+              setPlayerMessage('Trying another song…');
+              errorCountRef.current += 1;
               window.setTimeout(() => {
                 try {
-                  playerRef.current?.nextVideo?.();
+                  if (errorCountRef.current >= 3) {
+                    errorCountRef.current = 0;
+                    loadRandomStationPlaylist(playbackAllowedRef.current);
+                  } else playerRef.current?.nextVideo?.();
                 } catch {
                   /* ignore */
                 }
@@ -227,6 +279,7 @@ export default function App() {
         document.head.appendChild(tag);
       }
       const prev = window.onYouTubeIframeAPIReady;
+      // The YouTube iframe API requires this global callback.
       window.onYouTubeIframeAPIReady = () => {
         prev?.();
         createPlayer();
@@ -237,6 +290,7 @@ export default function App() {
       cancelled = true;
       readyRef.current = false;
       if (syncTimerRef.current) window.clearInterval(syncTimerRef.current);
+      if (trackCardTimerRef.current) window.clearTimeout(trackCardTimerRef.current);
       try {
         playerRef.current?.destroy?.();
       } catch {
@@ -246,7 +300,45 @@ export default function App() {
       stopAmbience();
       playerHost?.replaceChildren();
     };
-  }, [startAmbience, stopAmbience, syncTrack]);
+  }, [loadRandomStationPlaylist, startAmbience, stopAmbience, syncTrack]);
+
+  useEffect(() => {
+    const clockTimer = window.setInterval(() => setWallClock(new Date()), 1000);
+    return () => window.clearInterval(clockTimer);
+  }, []);
+
+  useEffect(() => {
+    const sessionId = crypto.randomUUID();
+    let lastActivity = Date.now();
+    let stopped = false;
+    const markActive = () => { lastActivity = Date.now(); };
+    const sendPresence = async (active = true, beacon = false) => {
+      const body = JSON.stringify({ sessionId, stationId: activeStation.id, active });
+      if (beacon && navigator.sendBeacon) return navigator.sendBeacon('/api/presence', new Blob([body], { type: 'application/json' }));
+      try {
+        const response = await fetch('/api/presence', { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: !active });
+        const data = await response.json();
+        if (!stopped && Number.isFinite(data.active)) setActiveListeners(data.active);
+      } catch { /* optional in local static preview */ }
+      return undefined;
+    };
+    const heartbeat = () => sendPresence(document.visibilityState === 'visible' && (isPlayingRef.current || Date.now() - lastActivity < 65000));
+    ['pointerdown', 'keydown', 'touchstart'].forEach((name) => window.addEventListener(name, markActive, { passive: true }));
+    const visibility = () => document.visibilityState === 'visible' ? (markActive(), sendPresence(true)) : sendPresence(false, true);
+    document.addEventListener('visibilitychange', visibility);
+    sendPresence(true);
+    const timer = window.setInterval(heartbeat, 25000);
+    const leave = () => sendPresence(false, true);
+    window.addEventListener('pagehide', leave);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      ['pointerdown', 'keydown', 'touchstart'].forEach((name) => window.removeEventListener(name, markActive));
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pagehide', leave);
+      leave();
+    };
+  }, [activeStation.id]);
 
   useEffect(() => {
     let timer;
@@ -272,43 +364,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!sleepMinutes) return undefined;
-    const deadline = Date.now() + sleepMinutes * 60 * 1000;
-    const updateRemaining = () => {
-      const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setSleepRemaining(seconds);
-      if (seconds === 0) {
-        playerRef.current?.pauseVideo?.();
-        stopAmbience();
-        setSleepMinutes(0);
-      }
-    };
-    updateRemaining();
-    const timer = window.setInterval(updateRemaining, 1000);
-    return () => window.clearInterval(timer);
-  }, [sleepMinutes, stopAmbience]);
-
-  useEffect(() => {
     const onKeyDown = (event) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) return;
       if (event.code === 'Space') {
         event.preventDefault();
-        if (playerRef.current) isPlaying ? playerRef.current.pauseVideo?.() : playerRef.current.playVideo?.();
+        togglePlayRef.current?.();
       } else if (event.key === 'ArrowRight') playerRef.current?.nextVideo?.();
       else if (event.key === 'ArrowLeft') playerRef.current?.previousVideo?.();
       else if (event.key.toLowerCase() === 'f') {
         if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
         else document.exitFullscreen?.();
-      } else if (event.key.toLowerCase() === 'h') document.querySelector('.cabin-horn')?.click();
+      } else if (event.key.toLowerCase() === 'h' && stationRef.current.id === 'odia-bus') document.querySelector('.cabin-horn')?.click();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPlaying]);
-
-  const handleSleepTimer = (minutes) => {
-    setSleepMinutes(minutes);
-    setSleepRemaining(minutes * 60);
-  };
+  }, []);
 
   useEffect(() => {
     if (!isPlaying) return undefined;
@@ -326,16 +396,25 @@ export default function App() {
     if (!readyRef.current || !player) return;
 
     if (isPlaying) {
+      playbackAllowedRef.current = false;
+      isPlayingRef.current = false;
       player.pauseVideo();
       setIsPlaying(false);
     } else {
+      playbackAllowedRef.current = true;
+      if (!stationPlaylistReadyRef.current) {
+        loadRandomStationPlaylist(true);
+        player.unMute();
+        player.setVolume(volumeRef.current);
+        return;
+      }
       try {
         if (typeof player.playVideoAt === 'function' && player.getPlaylist()?.length) {
           player.playVideo();
         } else {
           player.loadPlaylist({
             listType: 'playlist',
-            list: RADIO.playlistId,
+            list: stationRef.current.playlistId,
             index: randomStartRef.current,
           });
           player.setShuffle?.(true);
@@ -346,19 +425,35 @@ export default function App() {
       player.unMute();
       player.setVolume(volumeRef.current);
       setIsPlaying(true);
+      isPlayingRef.current = true;
       setTimeout(syncTrack, 600);
     }
   };
+  useEffect(() => {
+    togglePlayRef.current = togglePlay;
+  });
 
   const handleNext = () => {
     if (!readyRef.current || !playerRef.current) return;
-    playerRef.current.nextVideo();
+    loadRandomStationPlaylist(true);
     setIsPlaying(true);
     setTimeout(syncTrack, 600);
   };
 
+  const changeStation = (station) => {
+    if (station.id === stationRef.current.id) return;
+    playbackAllowedRef.current = false;
+    playerRef.current?.pauseVideo?.();
+    stopAmbience();
+    try {
+      playerRef.current?.destroy?.();
+    } catch { /* navigation will discard the iframe */ }
+    window.location.assign(station.path);
+  };
+
   const handlePrev = () => {
     if (!readyRef.current || !playerRef.current) return;
+    playbackAllowedRef.current = true;
     playerRef.current.previousVideo();
     setIsPlaying(true);
     setTimeout(syncTrack, 600);
@@ -372,6 +467,16 @@ export default function App() {
       playerRef.current.setVolume(value);
       if (value === 0) playerRef.current.mute();
       else playerRef.current.unMute();
+    }
+  };
+
+  const toggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    if (next) playerRef.current?.mute?.();
+    else {
+      playerRef.current?.unMute?.();
+      playerRef.current?.setVolume?.(volumeRef.current);
     }
   };
 
@@ -417,66 +522,48 @@ export default function App() {
     playerRef.current?.seekTo?.(next, true);
   };
 
-  const toggleRain = () => {
-    const next = !rainEnabledRef.current;
-    rainEnabledRef.current = next;
-    setRainEnabled(next);
-    localStorage.setItem('coach-rain', next ? 'on' : 'off');
-    const ambience = ambienceRef.current;
-    if (!ambience) return;
-    if (next && !ambience.rain) ambience.rain = createRainSound(ambience.context);
-    else if (!next && ambience.rain) {
-      ambience.rain.stop();
-      ambience.rain = null;
-    }
-  };
-
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.();
     else await document.exitFullscreen?.();
   };
 
   return (
-    <main className={`app coach-radio ${isPlaying ? 'is-playing' : ''} ${controlsVisible ? 'controls-visible' : 'controls-hidden'}`}>
+    <main className={`app coach-radio station-${activeStation.id} ${isPlaying ? 'is-playing' : ''} ${controlsVisible ? 'controls-visible' : 'controls-hidden'}`}>
       <div className="yt-audio-slot" aria-hidden="true"><div ref={playerHostRef} /></div>
       <div className="coach-shade" aria-hidden="true" />
+      <div className="active-presence"><i />{activeListeners === null ? 'Connecting…' : `${activeListeners} active ${activeListeners === 1 ? 'listener' : 'listeners'}`}</div>
       <header className={`floating-nav ${controlsVisible ? 'visible' : ''}`}>
-        <span className="route-id">OD · NIGHT 01</span>
-        <span className="listeners"><i /> {isPlaying ? 'ON THE ROAD' : 'READY TO DEPART'}</span>
-        <nav aria-label="Playlist links"><a href={`https://www.youtube.com/playlist?list=${RADIO.playlistId}`} target="_blank" rel="noreferrer">YouTube ↗</a><button type="button" onClick={toggleFullscreen}>{isFullscreen ? 'Exit Fullscreen ×' : 'Fullscreen ⛶'}</button></nav>
+        <span className="route-id">ODIA VINTAGE</span>
+        <time className="vintage-clock" dateTime={wallClock.toISOString()}>
+          {wallClock.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+        </time>
+        <nav aria-label="Player links"><a className="instagram-link" href="https://www.instagram.com/sujitptra_/" target="_blank" rel="noreferrer" aria-label="Sujit Patra on Instagram"><i className="instagram-mark" aria-hidden="true" />@sujitptra_ ↗</a><button type="button" onClick={toggleFullscreen}>{isFullscreen ? 'Exit Fullscreen ×' : 'Fullscreen ⛶'}</button></nav>
       </header>
 
-      <div className={`ride-motion ${rainEnabled ? 'rain-on' : ''}`} aria-hidden="true">
-        <video
-          className="windshield-video"
-          src="/assets/odia-night-road-loop.webm"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-        />
-        <span className="windshield-motion">
-          <i className="road-dash dash-left" />
-          <i className="road-dash dash-right" />
-          <i className="roadside-light lights-left" />
-          <i className="roadside-light lights-right" />
-        </span>
-        <span className="passing-beam beam-one" />
-        <span className="passing-beam beam-two" />
-        <span className="glass-streaks" />
-        <span className="rain-sheet rain-sheet-a" />
-        <span className="rain-sheet rain-sheet-b" />
-        <span className="road-glow" />
-        <span className="lightning-flash" />
+      <div className={`station-switcher ${controlsVisible ? 'visible' : ''}`} role="group" aria-label="Choose an Odia Vintage station">
+        {STATIONS.map((station) => (
+          <button className={station.id === activeStation.id ? 'active' : ''} type="button" key={station.id} onClick={() => changeStation(station)} aria-pressed={station.id === activeStation.id} disabled={station.id === activeStation.id}>
+            <small>{station.odiaLabel}</small>{station.label}
+          </button>
+        ))}
       </div>
-      <p className="route-whisper"><small>ରାତ୍ରି ବସ୍ ସେବା</small>{HIGHWAY_ROUTES[0]}</p>
-      <button className={`cabin-horn ${controlsVisible ? 'visible' : ''}`} type="button" onClick={triggerHorn} aria-label="Sound bus horn"><i />HORN</button>
+
+      <aside className={`listening-note ${isPlaying ? 'live' : ''}`} aria-label="Station mood">
+        <span className="note-eyebrow"><i />{isPlaying ? 'ଏବେ ବାଜୁଛି · LISTENING' : 'ସ୍ମୃତିର ସୁର · MOOD'}</span>
+        <strong>{activeStation.moodOdia}</strong>
+        <p>{isPlaying ? activeStation.mood : 'Press play and stay a while'}</p>
+        {isPlaying && <div className="note-wave" aria-hidden="true"><i /><i /><i /><i /><i /></div>}
+      </aside>
+      <div className="odia-alphabet-rail" aria-hidden="true">
+        {['ଅ','ଇ','ଏ','କ','ଚ','ଟ','ତ','ନ','ବ','ର','ସ'].map((letter) => <span key={letter}>{letter}</span>)}
+      </div>
+      {showTrackCard && <div className="track-title-card"><small>NOW PLAYING · {activeStation.label}</small><strong title={track.title}>{track.title}</strong>{track.artist && track.artist !== 'YouTube Live Mix' && <span>{track.artist}</span>}</div>}
+      {activeStation.id === 'odia-bus' && <button className={`cabin-horn ${controlsVisible ? 'visible' : ''}`} type="button" onClick={triggerHorn} aria-label="Sound bus horn"><i />HORN</button>}
 
       <section className="floating-player player-v3" aria-label="Music player">
         <div className="song-area">
-          <div className="player-kicker"><span>{String(track.index + 1).padStart(2, '0')} · {isPlaying ? 'PLAYING NOW' : 'NIGHT RADIO'}</span><i>{isPlaying ? 'SIGNAL LIVE' : 'STANDBY'}</i></div>
-          <div className="song-copy"><strong>{track.title}</strong><span>{track.artist}</span></div>
+          <div className="player-kicker"><span className="station-chip">{activeStation.odiaLabel}</span><span>TRACK {String(track.index + 1).padStart(2, '0')}</span><i>{isPlaying ? '● NOW PLAYING' : 'READY'}</i></div>
+          <div className="song-copy"><strong>{track.title}</strong><span>{playerMessage || track.artist}</span></div>
           <input className="seek" aria-label="Song position" type="range" min="0" max={Math.max(1, duration)} value={Math.min(currentTime, Math.max(1, duration))} onChange={(e) => handleSeek(e.target.value)} />
           <div className="time-row"><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
         </div>
@@ -485,21 +572,12 @@ export default function App() {
           <button className="main-play" type="button" onClick={togglePlay} disabled={!isApiReady} aria-label={isPlaying ? 'Pause' : 'Play'}>{!isApiReady ? '…' : isPlaying ? 'Ⅱ' : '▶'}</button>
           <button type="button" onClick={handleNext} disabled={!isApiReady} aria-label="Next track">›|</button>
         </div>
-        <div className="player-tools">
+        <div className="player-volume">
           <label className="compact-volume" title={`Volume ${volume}`}><span>VOL {volume}</span><input aria-label="Volume" type="range" min="0" max="100" value={volume} onChange={(e) => handleVolume(Number(e.target.value))} /></label>
-          <label className="sleep-timer">
-            <span>{sleepRemaining ? `SLEEP ${Math.ceil(sleepRemaining / 60)}M` : 'SLEEP'}</span>
-            <select aria-label="Sleep timer" value={sleepMinutes} onChange={(e) => handleSleepTimer(Number(e.target.value))}>
-              <option value="0">Off</option>
-              <option value="15">15 min</option>
-              <option value="30">30 min</option>
-              <option value="45">45 min</option>
-              <option value="60">60 min</option>
-            </select>
-          </label>
-          <button className={`rain-toggle ${rainEnabled ? 'on' : ''}`} type="button" onClick={toggleRain}>RAIN {rainEnabled ? 'ON' : 'OFF'}</button>
+          <button className="mute-button" type="button" onClick={toggleMute}>{isMuted ? 'Unmute' : 'Mute'}</button>
         </div>
       </section>
+      {showKeyboardHint && <button className="keyboard-hint" type="button" onClick={() => { localStorage.setItem('odia-vintage-key-help', 'seen'); setShowKeyboardHint(false); }}>Space Play · ← → Songs · F Fullscreen · Got it</button>}
     </main>
   );
 }
