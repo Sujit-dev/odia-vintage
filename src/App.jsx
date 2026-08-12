@@ -214,7 +214,7 @@ export default function App() {
           )
             return;
           const songs = player.getPlaylist?.() || [];
-          if (songs.length > 1)
+          if (!playNow && songs.length > 1)
             player.playVideoAt?.(Math.floor(Math.random() * songs.length));
           else if (playNow) player.playVideo?.();
           syncTrack();

@@ -45,11 +45,6 @@ export const STATIONS = [
         name: "Old Bhajans",
         seedVideoId: "oR2zlwCPL2k",
       },
-      {
-        id: "PLP3mTiRDfnMpWe6mlcgYiAz93pSUjwGzo",
-        name: "Old Bhajans",
-        seedVideoId: "b67-u90BGE",
-      },
     ],
     whisper: "Old bhajans from the temple town",
     moodOdia: "ଭକ୍ତିରେ ଭରା ସନ୍ଧ୍ୟା",
