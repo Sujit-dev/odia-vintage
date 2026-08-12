@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "odia-vintage",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-08-12",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "odia-vintage-presence",
+      "database_id": "f8a4e6b1-1051-477c-9945-4c206d0f9f15"
+    }
+  ]
+}

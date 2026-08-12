@@ -2352,6 +2352,17 @@ footer {
   background: #78c68d;
   box-shadow: 0 0 9px rgba(93, 222, 126, 0.8);
 }
+.active-presence b {
+  margin-left: 4px;
+  padding-left: 11px;
+  border-left: 1px solid rgba(255, 244, 228, 0.24);
+  color: rgba(255, 244, 228, 0.52);
+  font: inherit;
+}
+.active-presence.unavailable i {
+  background: #cda96f;
+  box-shadow: 0 0 9px rgba(205, 169, 111, 0.55);
+}
 .track-title-card {
   position: absolute;
   z-index: 14;

@@ -58,7 +58,7 @@ Use only playlists appropriate for that station. In particular, Jagannath Bhajan
 
 ## Listener presence
 
-The production build includes a small `/api/presence` endpoint backed by a D1-compatible SQLite database. Active sessions send a heartbeat while the page remains visible or music is playing. Inactive sessions stop counting after roughly 70 seconds, and stale database rows are removed after one day.
+The production build includes a small `/api/presence` endpoint backed by Cloudflare D1. Active sessions send a heartbeat while the page remains visible or music is playing. Inactive sessions stop counting after roughly 70 seconds, and stale database rows are removed after one day. The interface also shows the highest concurrent listener count reached during the current day, resetting at midnight in the `Asia/Kolkata` timezone.
 
 The schema is stored in:
 
