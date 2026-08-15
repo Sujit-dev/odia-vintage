@@ -56,6 +56,8 @@ Station configuration lives in `src/data/radio.js`. Add another object to a stat
 
 Use only playlists appropriate for that station. In particular, Jagannath Bhajana should contain devotional songs only. The `seedVideoId` provides a reliable starting track while the playlist loads.
 
+The built-in `tracks` queues enforce the station eras: Vintage Odisha and Odia Bus use old 1990s-style Odia songs, while Jagannath Bhajana uses devotional classics from the 1990s and 2000s. Once a listener starts playback, the YouTube player advances through the queue automatically, loops it, and skips failed or blocked videos.
+
 To exclude a song from every station, add its YouTube video ID to `BLOCKED_VIDEO_IDS` in `src/data/radio.js`. Blocked songs are skipped automatically without being shown as the current track.
 
 ## Listener presence

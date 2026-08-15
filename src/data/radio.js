@@ -19,9 +19,8 @@ export const STATIONS = [
     label: "Vintage Odisha",
     odiaLabel: "ପୁରୁଣା ଓଡ଼ିଶା",
     tracks: [
-      "EOuiPRsPg8E", "-40PLoONL-8", "0EfyLj5-hRM", "1n2ndoJzMjg",
-      "2_fq1AfLbMY", "CDl3fqCl0bs", "OiJmJQefcu4", "TOfVOEzcXqs",
-      "XHpKcPWIHbU", "XdH9LcR3Yos", "abZpopPefO4",
+      "EOuiPRsPg8E", "0EfyLj5-hRM", "X0G_eqEjhW4", "Cu4CUhof7l4",
+      "githim25FRs", "AsPMlyDlR28",
     ],
     playlists: [
       {
@@ -45,10 +44,9 @@ export const STATIONS = [
     label: "Jagannath Bhajana",
     odiaLabel: "ଜଗନ୍ନାଥ ଭଜନ",
     tracks: [
-      "oR2zlwCPL2k", "-7P21pmpeWg", "-J-3z8MdkPo", "-PLDUNYLYDA",
-      "0YiN5ZCfWW8", "1rIZiyzNySo", "1xBzDvVIZ_E", "2L_CePukOJU",
-      "3FySqRtfffY", "3mJnlLZYeLA", "AtmckQ3IMwM", "FAQFbanZe5w",
-      "HnbL-PKkySY",
+      "oR2zlwCPL2k", "mnQKhe6DP04", "3OqmvKdD_Uw", "Z61Z_dn9CsI",
+      "gY2yk_0MCqk", "EPvPKRD_C8o", "BK8OKrVWA_k", "e5AlQCm8s10",
+      "tvKwDGupVAc", "w_SbkYmmZeI", "3nS976O4eVQ", "1UoiZQIlSWo",
     ],
     playlists: [
       {
@@ -67,10 +65,8 @@ export const STATIONS = [
     label: "Odia Bus",
     odiaLabel: "ଓଡ଼ିଆ ବସ୍",
     tracks: [
-      "tmV3LN3OLSg", "-N_BFj_x2KI", "0FepsI03fzg", "0bLzxUoyBoo",
-      "17nAnQMvZrk", "1xWcWI94v3w", "36WL4aLCtJg", "4JCZDcHX6fs",
-      "5TQhWDkVqlU", "5bpQZ1hE0IM", "6KVcFa8hIpA", "7I4TEKJuuXQ",
-      "9iRoLHmTTy0",
+      "tmV3LN3OLSg", "6cNaOqODyV0", "U1qJfUyw31s", "LAYsdsjMSlg",
+      "_13g9XChPks", "tlH2-BEUz5w", "K608HD3Muao",
     ],
     playlists: [
       {
