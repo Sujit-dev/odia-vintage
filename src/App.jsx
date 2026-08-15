@@ -809,12 +809,6 @@ export default function App() {
       )}
 
       <section className="floating-player player-v3" aria-label="Music player">
-        <div className="mini-vinyl" aria-hidden="true">
-          <span>
-            <small>ODIA</small>
-            OV
-          </span>
-        </div>
         <div className="song-area">
           <div className="player-kicker">
             <span className="station-chip">{activeStation.odiaLabel}</span>
@@ -883,6 +877,12 @@ export default function App() {
           </button>
         </div>
       </section>
+      <div className="floating-vinyl" aria-hidden="true">
+        <span>
+          <small>ODIA</small>
+          OV
+        </span>
+      </div>
       {showKeyboardHint && (
         <button
           className="keyboard-hint"
