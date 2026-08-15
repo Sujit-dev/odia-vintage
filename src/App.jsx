@@ -29,6 +29,15 @@ function formatTime(seconds) {
   return `${mins}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 }
 
+function shuffledTracks(tracks = []) {
+  const queue = tracks.filter((id) => !BLOCKED_VIDEO_IDS.has(id));
+  for (let index = queue.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [queue[index], queue[swapIndex]] = [queue[swapIndex], queue[index]];
+  }
+  return queue;
+}
+
 export default function App() {
   const activeStation =
     STATIONS.find(
@@ -93,6 +102,7 @@ export default function App() {
     ...activeStation,
     playlistId: savedPlaylist.id,
     seedVideoId: savedPlaylist.seedVideoId,
+    activeTracks: activeStation.tracks?.filter((id) => !BLOCKED_VIDEO_IDS.has(id)) || [],
   });
   const resumeRef = useRef({
     index: Math.max(0, Number(savedPlayback?.index) || 0),
@@ -180,13 +190,27 @@ export default function App() {
         }),
       );
     }
-  }, []);
+  }, [setCurrentTime, setDuration, setPlayerMessage, setShowTrackCard, setTrack]);
 
   const loadRandomStationPlaylist = useCallback(
     (playNow = true) => {
       const player = playerRef.current;
       const station = stationRef.current;
-      if (!player || !station?.playlists?.length) return;
+      if (!player) return;
+      if (station.tracks?.length) {
+        const queue = shuffledTracks(station.tracks);
+        if (!queue.length) return;
+        stationRef.current = { ...station, activeTracks: queue };
+        stationPlaylistReadyRef.current = true;
+        playbackAllowedRef.current = playNow;
+        player[playNow ? "loadPlaylist" : "cuePlaylist"]({
+          playlist: queue,
+          index: 0,
+        });
+        player.setLoop?.(true);
+        return;
+      }
+      if (!station?.playlists?.length) return;
       const stationId = station.id;
       const generation = stationGenerationRef.current;
       const playlist =
@@ -262,18 +286,27 @@ export default function App() {
             event.target.unMute();
             event.target.setVolume(volumeRef.current);
             try {
-              event.target.cuePlaylist({
-                listType: "playlist",
-                list: stationRef.current.playlistId,
-                index: resumeRef.current.index,
-              });
+              const tracks = stationRef.current.activeTracks;
+              if (tracks?.length) {
+                event.target.cuePlaylist({
+                  playlist: tracks,
+                  index: Math.min(resumeRef.current.index, tracks.length - 1),
+                });
+                event.target.setLoop?.(true);
+              } else {
+                event.target.cuePlaylist({
+                  listType: "playlist",
+                  list: stationRef.current.playlistId,
+                  index: resumeRef.current.index,
+                });
+              }
             } catch {
               event.target.cueVideoById(stationRef.current.seedVideoId);
             }
             window.setTimeout(() => {
               try {
                 const playlist = event.target.getPlaylist?.() || [];
-                if (playlist.length > 1) {
+                if (playlist.length > 1 && !stationRef.current.activeTracks?.length) {
                   randomStartRef.current = Math.min(
                     resumeRef.current.index,
                     playlist.length - 1,
@@ -320,7 +353,7 @@ export default function App() {
             ) {
               if (event.data === state.ENDED) {
                 stopAmbience();
-                loadRandomStationPlaylist(true);
+                event.target.nextVideo?.();
               }
               syncTrack();
             }
