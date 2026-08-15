@@ -4022,9 +4022,9 @@ footer {
   }
   .player-v3 {
     width: calc(100vw - 20px);
-    grid-template-columns: 52px minmax(0, 1fr) auto 76px;
+    grid-template-columns: minmax(0, 1fr) auto 76px;
   }
-  .mini-vinyl { width: 52px; }
+  .mini-vinyl { display: none; }
   .player-v3 .song-copy strong,
   .player-v3 .song-copy span {
     display: block;
@@ -4043,14 +4043,7 @@ footer {
   .station-switcher button,
   .station-switcher button small { font-size: 7.5px; }
   .listening-note { right: 70px; width: auto; max-width: 250px; }
-  .player-v3 { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; }
-  .mini-vinyl {
-    width: 40px;
-    border-width: 1px;
-    box-shadow: 0 5px 12px rgba(0, 0, 0, 0.38), 0 0 0 4px rgba(224, 174, 107, 0.08);
-  }
-  .mini-vinyl span { width: 18px; border-width: 1px; font-size: 5px; }
-  .mini-vinyl small { display: none; }
+  .player-v3 { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .player-v3 .player-volume { display: none; }
   .player-v3 .player-buttons {
     display: flex;
@@ -4087,8 +4080,7 @@ footer {
   .station-switcher button small { display: none; }
   .listening-note { right: 64px; padding: 9px 10px; }
   .listening-note strong { font-size: 15px; }
-  .player-v3 { width: calc(100vw - 12px); grid-template-columns: 34px minmax(0, 1fr) auto; padding-left: 9px; }
-  .mini-vinyl { width: 34px; }
+  .player-v3 { width: calc(100vw - 12px); grid-template-columns: minmax(0, 1fr) auto; padding-left: 10px; }
   .odia-alphabet-rail { display: none; }
   .active-presence { font-size: 7px; }
 }
